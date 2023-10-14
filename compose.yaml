@@ -1,0 +1,9 @@
+version: "3"
+services:
+  go:
+    build:
+      context: .
+    volumes:
+      - ./src:/go/src
+    ports:
+      - "8880:8080"
