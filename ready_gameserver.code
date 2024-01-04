@@ -1,0 +1,59 @@
+gameServer := &agonesv1.GameServer{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "mc-server-",
+			Annotations: map[string]string{
+				"external-dns.alpha.kubernetes.io/hostname": "saulmaldonado.me.",
+				"external-dns.alpha.kubernetes.io/gameserver-service": "minecraft",
+			},
+		},
+		Spec: agonesv1.GameServerSpec{
+			Container: "mc-server",
+			Ports: []agonesv1.GameServerPort{
+				{
+					Name:          "mc",
+					PortPolicy:    agonesv1.Dynamic,
+					ContainerPort: 25565,
+					Protocol:      corev1.ProtocolTCP,
+				},
+			},
+			Health: agonesv1.Health{
+				InitialDelaySeconds: 60,
+				PeriodSeconds:       12,
+				FailureThreshold:    5,
+			},
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "mc-server",
+							Image: "itzg/minecraft-server",
+							Env: []corev1.EnvVar{
+								{Name: "EULA", Value: "TRUE"},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{MountPath: "/data", Name: "world-vol"},
+							},
+							Ports: []corev1.ContainerPort{
+								{ContainerPort: 25575},
+							},
+						},
+						{
+							Name:  "mc-monitor",
+							Image: "saulmaldonado/agones-mc",
+							Args:  []string{"monitor"},
+							Env: []corev1.EnvVar{
+								{Name: "INITIAL_DELAY", Value: "30s"},
+								{Name: "MAX_ATTEMPTS", Value: "5"},
+								{Name: "INTERVAL", Value: "10s"},
+								{Name: "TIMEOUT", Value: "10s"},
+							},
+							ImagePullPolicy: corev1.PullAlways,
+						},
+					},
+					Volumes: []corev1.Volume{
+						{Name: "world-vol", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+					},
+				},
+			},
+		},
+	}

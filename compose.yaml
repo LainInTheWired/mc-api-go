@@ -5,5 +5,7 @@ services:
       context: .
     volumes:
       - ./src:/go/src
+      - ~/.kube/config:/go/src/config
     ports:
       - "8880:8080"
+    tty: true

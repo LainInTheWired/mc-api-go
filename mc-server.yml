@@ -1,0 +1,60 @@
+apiVersion: 'agones.dev/v1'
+kind: GameServer
+metadata:
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: saulmaldonado.me.
+    external-dns.alpha.kubernetes.io/gameserver-service: minecraft
+  generateName: 'mc-server-' # Generates a unique name for GameServer and Pod
+spec:
+  container: mc-server # Minecraft server container name
+  ports:
+    - name: mc
+      # "Dynamic" (default) the system allocates a free hostPort for the gameserver (default 7000-8000), for game clients to connect to
+      portPolicy: Dynamic
+      # The name of the container to open the port on. Defaults to the game server container if omitted or empty.
+      container: mc-server
+      # the port that is being opened on the game server process
+      containerPort: 25565
+      # Minecraft uses TCP to connect players
+      protocol: TCP
+  # Health checking for the running game server
+  health:
+    # Number of seconds after the container has started before health check is initiated.
+    initialDelaySeconds: 60
+    # If the `Health()` function doesn't get called at least once every period (seconds), then
+    # the game server is not healthy.
+    periodSeconds: 12
+    # Minimum consecutive failures for the health probe to be considered failed after having succeeded.
+    failureThreshold: 5
+  template:
+    spec:
+      containers:
+        - name: mc-server
+          image: itzg/minecraft-server # Minecraft Java server image
+          env: # Full list of ENV variables at https://github.com/itzg/docker-minecraft-server
+            - name: EULA
+              value: "TRUE"
+          volumeMounts:
+            - mountPath: /data # shared vol with mc-load and mc-backup
+              name: world-vol
+          ports:
+            - containerPort: 25575 # exposes the RCON port to within the cluster from the pod's IP
+
+        - name: mc-monitor
+          image: saulmaldonado/agones-mc # monitor
+          args:
+            - monitor
+          env:
+            - name: INITIAL_DELAY
+              value: 30s
+            - name: MAX_ATTEMPTS
+              value: "5"
+            - name: INTERVAL
+              value: 10s
+            - name: TIMEOUT
+              value: 10s
+          imagePullPolicy: Always
+
+      volumes:
+        - name: world-vol # shared vol between containers. will not persist bewteen restarts
+          emptyDir: {}

@@ -1,0 +1,137 @@
+
+		gs := &agonesv1.GameServer{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: mcServerName,
+				Labels: map[string]string{
+					"userid": userid, // ラベルを追加
+				},
+			},
+			Spec: agonesv1.GameServerSpec{
+				Container: "mc-server",
+				Ports: []agonesv1.GameServerPort{
+					{
+						Name:          "mc",
+						PortPolicy:    "Dynamic",
+						ContainerPort: 25565,
+						Protocol:      "TCP",
+					},
+				},
+				Health: agonesv1.Health{
+					InitialDelaySeconds: 60,
+					PeriodSeconds:       12,
+					FailureThreshold:    5,
+				},
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "mc-server",
+								Image: "itzg/minecraft-server",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "EULA",
+										Value: "TRUE",
+									},
+								},
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										MountPath: "/data",
+										Name:      "world-vol",
+									},
+								},
+							},
+							{
+								Name:  "mc-monitor",
+								Image: "saulmaldonado/agones-mc",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "INITIAL_DELAY",
+										Value: "60s",
+									},
+									{
+										Name:  "MAX_ATTEMPTS",
+										Value: "5",
+									},
+									{
+										Name:  "INTERVAL",
+										Value: "10s",
+									},
+									{
+										Name:  "TIMEOUT",
+										Value: "10s",
+									},
+								},
+								Args:            []string{"monitor"},
+								ImagePullPolicy: "Always",
+							},
+							{
+								Name:  "mc-backup",
+								Image: "saulmaldonado/agones-mc",
+								Args:  []string{"backup"},
+								Env: []corev1.EnvVar{
+									{
+										Name:  "BUCKET_NAME",
+										Value: "agones-minecraft-mc-worlds",
+									},
+									{
+										Name:  "BACKUP_CRON",
+										Value: "0 */6 * * *",
+									},
+									{
+										Name:  "INITIAL_DELAY",
+										Value: "60s",
+									},
+									{
+										Name: "POD_NAME",
+										ValueFrom: &corev1.EnvVarSource{
+											FieldRef: &corev1.ObjectFieldSelector{
+												FieldPath: "metadata.name",
+											},
+										},
+									},
+									{
+										Name:  "RCON_PASSWORD",
+										Value: "minecraft",
+									},
+								},
+								ImagePullPolicy: "Always",
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										MountPath: "/data",
+										Name:      "world-vol",
+									},
+								},
+							},
+							// {
+							// 	Name:  "mc-fileserver",
+							// 	Image: "saulmaldonado/agones-mc",
+							// 	Args:  []string{"fileserver"},
+							// 	Env: []corev1.EnvVar{
+							// 		{
+							// 			Name:  "VOLUME",
+							// 			Value: "/data",
+							// 		},
+							// 	},
+							// 	ImagePullPolicy: "Always",
+							// 	VolumeMounts: []corev1.VolumeMount{
+							// 		{
+							// 			MountPath: "/data",
+							// 			Name:      "world-vol",
+							// 		},
+							// 	},
+							// },
+						},
+						Volumes: []corev1.Volume{
+							{
+								Name: "world-vol",
+								VolumeSource: corev1.VolumeSource{
+									PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+										ClaimName: pvcName,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
